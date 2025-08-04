@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthcare Triage Chatbot</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f7f6; }
+        .chat-container { max-width: 600px; margin: 40px auto; border: 1px solid #ddd; border-radius: 8px; background-color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; height: 80vh; }
+        .chat-header { background-color: #007bff; color: white; padding: 15px; border-top-left-radius: 8px; border-top-right-radius: 8px; text-align: center; }
+        .chat-box { flex-grow: 1; padding: 20px; overflow-y: auto; }
+        .message { margin-bottom: 15px; }
+        .user-message { text-align: right; }
+        .bot-message .msg-bubble { background-color: #e9ecef; color: #333; }
+        .user-message .msg-bubble { background-color: #007bff; color: white; }
+        .msg-bubble { display: inline-block; padding: 10px 15px; border-radius: 18px; max-width: 80%; }
+        .input-area { padding: 20px; border-top: 1px solid #ddd; }
+        #message-input { width: calc(100% - 80px); padding: 10px; border: 1px solid #ccc; border-radius: 20px; }
+        #send-button { width: 70px; padding: 10px; border: none; background-color: #007bff; color: white; border-radius: 20px; cursor: pointer; }
+        .options-container button { background-color: #f0f0f0; border: 1px solid #007bff; color: #007bff; padding: 8px 12px; margin: 5px; border-radius: 15px; cursor: pointer; }
+        .options-container button:hover { background-color: #007bff; color: white; }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">
+        <h2>Triage Assistant</h2>
+        <p style="font-size: 0.8em; margin: 0; padding: 0;">This is a demo and not for medical use.</p>
+    </div>
+    <div class="chat-box" id="chat-box">
+        </div>
+    <div class="input-area">
+        <div id="options-container" class="options-container"></div>
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button id="send-button" onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+    let userId = null; // Will be set by the server on the first message
+
+    // Function to add a message to the chat box
+    function appendMessage(sender, text) {
+        const chatBox = document.getElementById('chat-box');
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message', sender === 'user' ? 'user-message' : 'bot-message');
+        
+        const bubble = document.createElement('div');
+        bubble.classList.add('msg-bubble');
+        bubble.textContent = text;
+        
+        messageDiv.appendChild(bubble);
+        chatBox.appendChild(messageDiv);
+        chatBox.scrollTop = chatBox.scrollHeight; // Auto-scroll to bottom
+    }
+
+    // Function to handle sending a message
+    async function sendMessage(messageText = null) {
+        const inputField = document.getElementById('message-input');
+        const message = messageText || inputField.value.trim();
+
+        if (!message) return;
+
+        appendMessage('user', message);
+        inputField.value = ''; // Clear input field
+        document.getElementById('options-container').innerHTML = ''; // Clear options
+        inputField.disabled = true; // Disable input while bot replies
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 'user_id': userId, 'message': message })
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            const data = await response.json();
+            userId = data.user_id; // Store the user ID from the first response
+
+            appendMessage('bot', data.bot_message);
+
+            // Display options if they exist
+            if (data.options && data.options.length > 0) {
+                displayOptions(data.options);
+                inputField.style.display = 'none'; // Hide text input when options are shown
+                document.getElementById('send-button').style.display = 'none';
+            } else {
+                inputField.style.display = 'inline-block';
+                document.getElementById('send-button').style.display = 'inline-block';
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+            appendMessage('bot', 'Sorry, something went wrong. Please try again later.');
+        } finally {
+             inputField.disabled = false;
+             if (document.activeElement !== inputField) {
+                inputField.focus();
+             }
+        }
+    }
+    
+    function displayOptions(options) {
+        const optionsContainer = document.getElementById('options-container');
+        options.forEach(optionText => {
+            const button = document.createElement('button');
+            button.textContent = optionText;
+            button.onclick = () => sendMessage(optionText); // Send option text as message
+            optionsContainer.appendChild(button);
+        });
+    }
+
+    // Allow sending message with Enter key
+    document.getElementById('message-input').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    // Initial greeting from the bot
+    window.onload = () => {
+        // Start the conversation by sending an empty message
+        sendMessage("start");
+    };
+
+</script>
+
+</body>
+</html>
